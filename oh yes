@@ -1,87 +1,88 @@
-local l_LocalPlayer_0 = game.Players.LocalPlayer
+local lp = game.Players.LocalPlayer
 
-local f = {"Map","Built","Thrown"}
-
-for i=1,#f do
-    if not workspace:FindFirstChild(f[i]) then
-        local x = Instance.new("Folder")
-        x.Name = f[i]
-        x.Parent = workspace
+local t = {"Map","Built","Thrown"}
+for i=1,#t do
+    if not workspace:FindFirstChild(t[i]) then
+        local f = Instance.new("Folder")
+        f.Name = t[i]
+        f.Parent = workspace
     end
 end
 
-local function v44(v43)
-    if v43 and not v43:IsA("Player") then
-        return v43
-    else
-        return v43 and v43.Character or l_LocalPlayer_0.Character
+local function c(x)
+    if typeof(x) == "Instance" and x:IsA("Model") then
+        return x
     end
+    if typeof(x) == "Instance" and x:IsA("Player") then
+        return x.Character
+    end
+    return lp.Character
 end
 
-local function v46(v45)
-    return not not v45 and v44(v45).HumanoidRootPart or v44() and v44().PrimaryPart
+local function h(x)
+    local m = c(x)
+    return m and m:FindFirstChildOfClass("Humanoid")
 end
 
-local function _(v47)
-    return v47 and v44(v47):FindFirstChildOfClass("Humanoid") or v44() and v44():FindFirstChildOfClass("Humanoid")
+local function a(x)
+    local hu = h(x)
+    return hu and hu:FindFirstChildOfClass("Animator")
 end
 
-local function _(v49)
-    return v49 and v44(v49):FindFirstChildOfClass("Humanoid"):FindFirstChild("Animator") or v44() and v44():FindFirstChildOfClass("Humanoid"):FindFirstChild("Animator")
-end
+local lib = _G.Lib or loadstring(game:HttpGet("https://raw.githubusercontent.com/Tariviste/wehatepastebin/refs/heads/main/library"))()
+_G.Lib = lib
 
-local v51 = _G.Lib or loadstring(game:HttpGet("https://raw.githubusercontent.com/Tariviste/wehatepastebin/refs/heads/main/library"))()
-if not _G.Lib then
-    _G.Lib = v51
-end
+local am = loadstring(game:HttpGet("https://raw.githubusercontent.com/ProudNamed/SuperLightning/refs/heads/main/AnimModule/MainModule"))()
 
-local l_v4_0 = v4
-local v59 = loadstring(game:HttpGet("https://raw.githubusercontent.com/ProudNamed/SuperLightning/refs/heads/main/AnimModule/MainModule"))()
+local cur = nil
 
-local a = nil
+local function play(id, _, m)
+    local ch = m or c()
+    if not ch then return end
 
-local function v73(v60, _, v62)
-    local v63 = v62 or v44()
-    local v64 = game:GetObjects(v60)[1]
-    local v65 = {}
+    local an = game:GetObjects(id)[1]
+    if not an then return end
 
-    for _, v67 in pairs(v64:GetDescendants()) do
-        if v67:IsA("KeyframeMarker") then
-            v65[v67.Name] = v67.Parent.Time
+    local mk = {}
+
+    for _,d in pairs(an:GetDescendants()) do
+        if d:IsA("KeyframeMarker") then
+            mk[d.Name] = d.Parent.Time
         end
-        if v67:IsA("Pose") and tostring(v67.EasingStyle) == "Enum.PoseEasingStyle.Constant" then
-            local v68 = v67:Clone()
-            v68.Parent = v67.Parent
-            v68.EasingStyle = Enum.PoseEasingStyle.Linear
-            v67:Destroy()
+        if d:IsA("Pose") and tostring(d.EasingStyle) == "Enum.PoseEasingStyle.Constant" then
+            local n = d:Clone()
+            n.Parent = d.Parent
+            n.EasingStyle = Enum.PoseEasingStyle.Linear
+            d:Destroy()
         end
     end
 
-    local v69 = v59.new(v63, v64)
-    a = v69
-    v69.Priority = Enum.AnimationPriority.Action4
+    local tr = am.new(ch, an)
+    cur = tr
+    tr.Priority = Enum.AnimationPriority.Action4
 
-    v69.GetMarkerReachedSignal = function(_, v71, v72)
-        if v65[v71] then
+    function tr:GetMarkerReachedSignal(n, cb)
+        if mk[n] then
             task.spawn(function()
-                while task.wait() and v69.IsPlaying do
-                    if v69.TimePosition >= v65[v71] then
-                        v72()
+                while tr.IsPlaying do
+                    if tr.TimePosition >= mk[n] then
+                        cb()
                         break
                     end
+                    task.wait()
                 end
             end)
         end
     end
 
-    v69:Play(0.5)
-    return v69
+    tr:Play(0.5)
+    return tr
 end
 
-local function StopAnimation()
-    if a and a.IsPlaying then
-        a:Stop()
+local function stop()
+    if cur and cur.IsPlaying then
+        cur:Stop()
     end
 end
 
-v73("rbxassetid://15986498343")
+play("rbxassetid://15508733273")
