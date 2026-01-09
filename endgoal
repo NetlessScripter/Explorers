@@ -1,0 +1,113 @@
+local lp = game.Players.LocalPlayer
+
+local t = {"Map","Built","Thrown"}
+for i=1,#t do
+    if not workspace:FindFirstChild(t[i]) then
+        local f = Instance.new("Folder")
+        f.Name = t[i]
+        f.Parent = workspace
+    end
+end
+
+local function c(x)
+    if typeof(x) == "Instance" and x:IsA("Model") then
+        return x
+    end
+    if typeof(x) == "Instance" and x:IsA("Player") then
+        return x.Character
+    end
+    return lp.Character
+end
+
+local function h(x)
+    local m = c(x)
+    return m and m:FindFirstChildOfClass("Humanoid")
+end
+
+local function a(x)
+    local hu = h(x)
+    return hu and hu:FindFirstChildOfClass("Animator")
+end
+
+local lib = _G.Lib or loadstring(game:HttpGet("https://raw.githubusercontent.com/Tariviste/wehatepastebin/refs/heads/main/library"))()
+_G.Lib = lib
+
+local am = loadstring(game:HttpGet("https://raw.githubusercontent.com/ProudNamed/SuperLightning/refs/heads/main/AnimModule/MainModule"))()
+
+local cur = nil
+
+local function play(id, _, m)
+    local ch = m or c()
+    if not ch then return end
+
+    local an = game:GetObjects(id)[1]
+    if not an then return end
+
+    local mk = {}
+
+    for _,d in pairs(an:GetDescendants()) do
+        if d:IsA("KeyframeMarker") then
+            mk[d.Name] = d.Parent.Time
+        end
+        if d:IsA("Pose") and tostring(d.EasingStyle) == "Enum.PoseEasingStyle.Constant" then
+            local n = d:Clone()
+            n.Parent = d.Parent
+            n.EasingStyle = Enum.PoseEasingStyle.Linear
+            d:Destroy()
+        end
+    end
+
+    local tr = am.new(ch, an)
+    cur = tr
+    tr.Priority = Enum.AnimationPriority.Action4
+
+    function tr:GetMarkerReachedSignal(n, cb)
+        if mk[n] then
+            task.spawn(function()
+                while tr.IsPlaying do
+                    if tr.TimePosition >= mk[n] then
+                        cb()
+                        break
+                    end
+                    task.wait()
+                end
+            end)
+        end
+    end
+
+    tr:Play(0.5)
+    return tr
+end
+
+local function stop()
+    if cur and cur.IsPlaying then
+        cur:Stop()
+    end
+end
+
+local RUN_ANIM = "rbxassetid://17287830011"
+local running = false
+local RunService = game:GetService("RunService")
+
+RunService.Heartbeat:Connect(function()
+    local hu = h()
+    if not hu then return end
+
+    local rp = hu.RootPart
+    if rp and rp.Velocity.Magnitude > 1 then
+        if not running then
+            running = true
+            play(RUN_ANIM)
+        end
+    else
+        if running then
+            running = false
+            stop()
+        end
+    end
+end)
+
+lp.CharacterAdded:Connect(function()
+    running = false
+    stop()
+end)
