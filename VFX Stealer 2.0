@@ -1,0 +1,161 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+if not RunService:IsClient() then return end
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local hrp = character:WaitForChild("HumanoidRootPart")
+
+local scale = 0.1
+local ripobject = game.ReplicatedStorage.Effects.Kamehameha.Start.Middle[B]
+
+local function serializeValue(v)
+	if typeof(v) == "Color3" then
+		return string.format("Color3.new(%f, %f, %f)", v.R, v.G, v.B)
+	elseif typeof(v) == "Vector3" then
+		return string.format("Vector3.new(%f, %f, %f)", v.X, v.Y, v.Z)
+	elseif typeof(v) == "Vector2" then
+		return string.format("Vector2.new(%f, %f)", v.X, v.Y)
+	elseif typeof(v) == "CFrame" then
+		local comps = {v:GetComponents()}
+		return "CFrame.new(" .. table.concat(comps, ", ") .. ")"
+	elseif typeof(v) == "BrickColor" then
+		return string.format("BrickColor.new(%q)", v.Name)
+	elseif typeof(v) == "EnumItem" then
+		return string.format("Enum.%s.%s", tostring(v.EnumType):gsub("Enum.", ""), v.Name)
+	elseif typeof(v) == "ColorSequence" then
+		local keypoints = {}
+		for _, k in ipairs(v.Keypoints) do
+			table.insert(keypoints, string.format("ColorSequenceKeypoint.new(%f, Color3.new(%f, %f, %f))", k.Time, k.Value.R, k.Value.G, k.Value.B))
+		end
+		return "ColorSequence.new({"..table.concat(keypoints, ", ").."})"
+	elseif typeof(v) == "NumberSequence" then
+		local keypoints = {}
+		for _, k in ipairs(v.Keypoints) do
+			table.insert(keypoints, string.format("NumberSequenceKeypoint.new(%f, %f, %f)", k.Time, k.Value, k.Envelope or 0))
+		end
+		return "NumberSequence.new({"..table.concat(keypoints, ", ").."})"
+	elseif typeof(v) == "NumberRange" then
+		return string.format("NumberRange.new(%f, %f)", v.Min, v.Max)
+	elseif type(v) == "string" then
+		return string.format("%q", v)
+	elseif type(v) == "boolean" or type(v) == "number" then
+		return tostring(v)
+	else
+		return "nil"
+	end
+end
+
+local function serializeInstance(obj, var)
+	local lines = {}
+	table.insert(lines, string.format("local %s = Instance.new(%q)", var, obj.ClassName))
+	table.insert(lines, string.format("%s.Name = %q", var, obj.Name))
+	local props = {
+		"Size","Color","Transparency","Reflectance","Material","CanCollide","Shape",
+		"BrickColor","CFrame","Orientation","Position","TextureID","MeshId","MeshType",
+		"Texture","CastShadow","ZIndex","Face","Anchored","Rate","Lifetime","Speed",
+		"LightEmission","LightInfluence","Rotation","RotSpeed","SpreadAngle","Texture",
+		"SizeSequence","TransparencySequence","ColorSequence","EmissionDirection",
+		"Enabled","LockedToPart","TimeScale","Color","TextureLength","TextureMode",
+		"TextureSpeed","Transparency","Brightness","Length","FaceCamera",
+		"StudsPerTileU","StudsPerTileV","OffsetStudsU","OffsetStudsV",
+		"BackgroundColor3","BackgroundTransparency","Text","Font","TextColor3",
+		"TextScaled","TextSize","TextStrokeColor3","TextStrokeTransparency",
+		"TextTransparency","Image","ImageColor3","ImageTransparency"
+	}
+	for _, prop in ipairs(props) do
+		pcall(function()
+			local v = obj[prop]
+			if v ~= nil then
+				table.insert(lines, string.format("%s.%s = %s", var, prop, serializeValue(v)))
+			end
+		end)
+	end
+	if obj:IsA("BasePart") then
+		table.insert(lines, string.format("%s.Anchored = true", var))
+	end
+	for _, child in ipairs(obj:GetChildren()) do
+		local childVar = var .. "_" .. child.Name:gsub("%W", "")
+		for _, l in ipairs(serializeInstance(child, childVar)) do
+			table.insert(lines, l)
+		end
+		table.insert(lines, string.format("%s.Parent = %s", childVar, var))
+	end
+	return lines
+end
+
+local topVar = "ripped"
+local code = serializeInstance(ripobject, topVar)
+table.insert(code, string.format("%s.Parent = workspace", topVar))
+table.insert(code, [[
+local Players = game:GetService("Players")
+local p = Players.LocalPlayer
+local hrp = p.Character and p.Character:FindFirstChild("HumanoidRootPart")
+local scale = ]]..scale..[[
+
+if hrp then
+	local cf = hrp.CFrame * CFrame.new(0, 0, -5)
+
+	local function scaleParticle(pe)
+		if not pe:IsA("ParticleEmitter") then return end
+		local props = {"Size","Speed","Lifetime","Rotation","RotSpeed","SpreadAngle","VelocitySpread"}
+		for _,prop in ipairs(props) do
+			local ok, val = pcall(function() return pe[prop] end)
+			if ok and val ~= nil then
+				if typeof(val) == "NumberRange" then
+					pe[prop] = NumberRange.new(val.Min * scale, val.Max * scale)
+				elseif typeof(val) == "NumberSequence" then
+					local keys = {}
+					for _,k in ipairs(val.Keypoints) do
+						table.insert(keys, NumberSequenceKeypoint.new(k.Time, k.Value * scale, k.Envelope))
+					end
+					pe[prop] = NumberSequence.new(keys)
+				elseif typeof(val) == "Vector2" then
+					pe[prop] = Vector2.new(val.X * scale, val.Y * scale)
+				elseif typeof(val) == "Vector3" then
+					pe[prop] = Vector3.new(val.X * scale, val.Y * scale, val.Z * scale)
+				elseif type(val) == "number" then
+					pe[prop] = val * scale
+				end
+			end
+		end
+		pe.Enabled = true
+		pe:Emit(15)
+	end
+
+	if ]]..topVar..[[:IsA("Model") then
+		]]..topVar..[[:PivotTo(cf)
+		for _,v in ipairs(]]..topVar..[[:GetDescendants()) do
+			if v:IsA("BasePart") then 
+				v.Anchored = true
+				v.Size = v.Size * scale
+			elseif v:IsA("ParticleEmitter") then
+				scaleParticle(v)
+			elseif v:IsA("Trail") and v.Lifetime then
+				v.Lifetime = v.Lifetime * scale
+			elseif v:IsA("Attachment") then
+				for _,pe in ipairs(v:GetChildren()) do
+					if pe:IsA("ParticleEmitter") then
+						scaleParticle(pe)
+					end
+				end
+			end
+		end
+	elseif ]]..topVar..[[:IsA("BasePart") then
+		]]..topVar..[[.CFrame = cf
+		]]..topVar..[[.Anchored = true
+		]]..topVar..[[.Size = ]]..topVar..[[.Size * scale
+		for _,v in ipairs(]]..topVar..[[ :GetChildren()) do
+			if v:IsA("ParticleEmitter") then
+				scaleParticle(v)
+			end
+		end
+	end
+end
+]])
+table.insert(code, string.format("return %s", topVar))
+local scriptText = table.concat(code, "\n")
+setclipboard(scriptText)
+print("✅ Copied rip to clipboard:", ripobject:GetFullName(), "Scale:", scale)
